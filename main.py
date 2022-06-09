@@ -1,6 +1,8 @@
 # %% importing
 
 import os
+import pathlib
+
 import cv2
 import numpy as np
 import pandas as pd
@@ -8,10 +10,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import colorcet as cc
 from collections import Counter
-
 from skimage.feature import hog
 from skimage.transform import resize
-
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import train_test_split
 from sklearn import preprocessing
@@ -19,13 +19,21 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.svm import SVC
 from sklearn.ensemble import GradientBoostingClassifier
-
 from project_functions import hist_wh, class2mat, train_test_model
+from pathlib import Path
 
-# %%  defining path of data and listing images
-# insert the path in which you saved the images
-images_path = 'C:/Users/Yael A/Desktop/machine learning for neuroscience/project/project data'
-images_names = os.listdir(images_path)
+
+def get_list_images():
+    """
+    # %%  defining path of data and listing images
+    # insert the path in which you saved the images
+    :rtype: object
+    """
+    images_path = Path('./data').absolute()
+    return images_path, os.listdir(images_path)
+
+images_path, images_names = get_list_images()
+print(images_names)
 
 # %% hist of widths and heights
 
@@ -34,10 +42,10 @@ heights = []
 
 for i in range(0, len(images_names)):
     image_name = images_names[i]
-    image_path = images_path + '/' + image_name
-    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    widths.append(img.shape[1])
-    heights.append(img.shape[0])
+    image_path = str(images_path) + '/' + image_name
+    num_rows, num_cols = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE).shape
+    widths.append(num_cols)
+    heights.append(num_rows)
 
 plt.hist(widths)
 plt.xlabel('width')
@@ -235,3 +243,8 @@ GB_parameters = {
 GB_params, GB_train, GB_validation = train_test_model(model_GB, GB_parameters,
                                                       X_train, y_train,
                                                       X_test, y_test)
+def main():
+
+
+if __name__ == "__main__":
+    main()
