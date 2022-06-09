@@ -2,7 +2,6 @@
 
 import os
 import pathlib
-
 import cv2
 import numpy as np
 import pandas as pd
@@ -243,8 +242,6 @@ GB_parameters = {
 GB_params, GB_train, GB_validation = train_test_model(model_GB, GB_parameters,
                                                       X_train, y_train,
                                                       X_test, y_test)
-def main():
 
-
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
