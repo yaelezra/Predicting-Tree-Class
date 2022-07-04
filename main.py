@@ -1,7 +1,7 @@
 # %% importing
 
+from pathlib import Path
 import os
-import pathlib
 import cv2
 import numpy as np
 import pandas as pd
@@ -18,27 +18,75 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.svm import SVC
 from sklearn.ensemble import GradientBoostingClassifier
-from project_functions import hist_wh, class2mat, train_test_model
-from pathlib import Path
+#from project_functions import get_list_images, plot_hist_size, hist_middle, class2mat, train_test_model
 
+
+# %% functions
 
 def get_list_images():
     """
-    # %%  defining path of data and listing images
-    # insert the path in which you saved the images
-    :rtype: object
-    """
-    images_path = Path('./data').absolute()
-    return images_path, os.listdir(images_path)
+    This function defines the path of the data folder and lists int content
+    :return: path of data folder and a list of the images in the folder
 
-images_path, images_names = get_list_images()
-print(images_names)
+    """
+
+    path = Path('./data').absolute()
+    return path, os.listdir(path)
+
+
+def plot_hist_size(sizes, name_of_size):
+    """
+    This function plots a histogram from a list of sizes
+    :param sizes: list of sizes we want to plot histogram for
+    :param name_of_size: the name of the size (for example: 'width', 'height', 'length')
+    :return: histogram of the sizes
+    """
+    plt.hist(sizes)
+    plt.xlabel(name_of_size)
+    plt.ylabel('count')
+    plt.title('histogram of ' + name_of_size + 's')
+    plt.show()
+
+
+def hist_middle(lst):
+    """
+    This function calculates the average of the bin with the highest histogram count
+    :param lst: list of sizes
+    :return: new_size: the value which is the middle of the bin with the most counts
+    """
+    hist = np.histogram(lst)
+    new_idx = np.where(hist[0] == np.max(hist[0]))
+    new_size = np.round((hist[1][new_idx[0][0]] + hist[1][new_idx[0][0] + 1]) / 2)
+    return new_size
+
+
+def class2mat(pattern, w, h, names, path):
+    """
+    This function assigns all images in a certain class into a numpy array, after resizing them
+    :param pattern: The pattern of the class. for example, for images from class 1: 'l1nr'
+    :param w: the new width of the images (they are resized to it)
+    :param h: the new height of the images (they are resized to it)
+    :param names: a list of names of all the images
+    :param path: path of the data folder that contains the images
+    :return: full_mat: a numpy array contains all the images in the class
+    """
+    class_images = list(filter(lambda x: pattern in x, names))
+    full_mat = np.zeros((int(h), int(w), 75))
+
+    for j in range(0, len(class_images)):
+        class_img_path = path + '/' + class_images[j]
+        class_img = cv2.imread(class_img_path, cv2.IMREAD_GRAYSCALE)
+        img_resized = resize(class_img, (h, w))
+        full_mat[:, :, j] = img_resized
+    return full_mat
+
 
 # %% hist of widths and heights
 
+images_path, images_names = get_list_images()
+
 widths = []
 heights = []
-
 for i in range(0, len(images_names)):
     image_name = images_names[i]
     image_path = str(images_path) + '/' + image_name
@@ -46,21 +94,13 @@ for i in range(0, len(images_names)):
     widths.append(num_cols)
     heights.append(num_rows)
 
-plt.hist(widths)
-plt.xlabel('width')
-plt.ylabel('count')
-plt.title('histogram of widths')
-plt.show()
-
-plt.hist(heights)
-plt.xlabel('height')
-plt.ylabel('count')
-plt.title('histogram of heights')
-plt.show()
+# plotting histograms of widths ang heights
+plot_hist_size(widths, 'width')
+plot_hist_size(heights, 'height')
 
 # choosing new width and new height for resizing
-new_width = hist_wh(widths)
-new_height = hist_wh(heights)
+new_width = hist_middle(widths)
+new_height = hist_middle(heights)
 
 # %% intra class variability
 
@@ -68,7 +108,7 @@ class_sizes = {}
 for c in range(0, 15):
     # saving the resized images of this class as a mat
     subs = 'l' + str(c + 1) + 'nr'
-    class_mat = class2mat(subs, new_width, new_height, images_names, images_path)
+    class_mat = class2mat(subs, new_width, new_height, images_names, str(images_path))
     class_shape = class_mat.shape
     class_sizes[subs] = class_shape[2]
 
@@ -86,7 +126,7 @@ all_labels = []
 for i in range(0, len(images_names)):
     # reading the image
     image_name = images_names[i]
-    image_path = images_path + '/' + image_name
+    image_path = str(images_path) + '/' + image_name
     img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
 
     # resizing
@@ -94,12 +134,8 @@ for i in range(0, len(images_names)):
 
     # feature extraction using hog
     pix = 300
-    hog_features, hog_img = hog(
-        img_resized, pixels_per_cell=(pix, pix),
-        cells_per_block=(2, 2),
-        orientations=9,
-        visualize=True,
-        block_norm='L2-Hys')
+    hog_features, hog_img = hog(img_resized, pixels_per_cell=(pix, pix), cells_per_block=(2, 2),
+                                orientations=9, visualize=True, block_norm='L2-Hys')
 
     features.append(np.transpose(hog_features))
 
@@ -108,11 +144,6 @@ for i in range(0, len(images_names)):
     all_labels.append(int(label))
 
 features_data = np.array(features)
-
-# %% exploring features data
-
-features_df = pd.DataFrame(features_data)
-des_features = features_df.describe()
 
 # %% PCA
 
@@ -237,7 +268,7 @@ GB_parameters = {
     'model__max_depth': [5, 10, 50, 100],
     'model__subsample': [0.5],
     'model__learning_rate': [0.001, 0.1, 0.5, 0.7],
-    }
+}
 
 GB_params, GB_train, GB_validation = train_test_model(model_GB, GB_parameters,
                                                       X_train, y_train,

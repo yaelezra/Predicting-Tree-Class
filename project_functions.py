@@ -1,5 +1,5 @@
-# %% importing
-
+from pathlib import Path
+import os
 from sklearn.model_selection import GridSearchCV
 from sklearn import metrics
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
@@ -12,20 +12,53 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-# %% functions
+def get_list_images():
+    """
+    This function defines the path of the data folder and lists int content
+    :return: path of data folder and a list of the images in the folder
 
-# The new size(width or height is the most common value in the histogram
-# lst - list of sizes (width of heights) of the images
-def hist_wh(lst):
-    hist_wh = np.histogram(lst)
-    new_idx = np.where(hist_wh[0] == np.max(hist_wh[0]))
-    new_size = np.round((hist_wh[1][new_idx[0][0]] + hist_wh[1][new_idx[0][0] + 1]) / 2)
+    """
+
+    path = Path('./data').absolute()
+    return path, os.listdir(path)
+
+
+def plot_hist_size(sizes, name_of_size):
+    """
+    This function plots a histogram from a list of sizes
+    :param sizes: list of sizes we want to plot histogram for
+    :param name_of_size: the name of the size (for example: 'width', 'height', 'length')
+    :return: histogram of the sizes
+    """
+    plt.hist(sizes)
+    plt.xlabel(name_of_size)
+    plt.ylabel('count')
+    plt.title('histogram of '+name_of_size+'s')
+    plt.show()
+
+
+def hist_middle(lst):
+    """
+    This function calculates the average of the bin with the highest histogram count
+    :param lst: list of sizes
+    :return: new_size: the value which is the middle of the bin with the most counts
+    """
+    hist = np.histogram(lst)
+    new_idx = np.where(hist[0] == np.max(hist[0]))
+    new_size = np.round((hist[1][new_idx[0][0]] + hist[1][new_idx[0][0] + 1]) / 2)
     return new_size
 
 
-# assigning all images of a certain class into a numpy array
-# pattern - pattern of class name, w - width of images, h - height of images, names - of images, path - path of images
 def class2mat(pattern, w, h, names, path):
+    """
+    This function assigns all images in a certain class into a numpy array, after resizing them
+    :param pattern: The pattern of the class. for example, for images from class 1: 'l1nr'
+    :param w: the new width of the images (they are resized to it)
+    :param h: the new height of the images (they are resized to it)
+    :param names: a list of names of all the images
+    :param path: path of the data folder that contains the images
+    :return: full_mat: a numpy array contains all the images in the class
+    """
     class_images = list(filter(lambda x: pattern in x, names))
     full_mat = np.zeros((int(h), int(w), 75))
 
