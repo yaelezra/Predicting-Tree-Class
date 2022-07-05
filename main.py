@@ -1,84 +1,20 @@
 # %% importing
 
-from pathlib import Path
-import os
 import cv2
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import colorcet as cc
-from collections import Counter
 from skimage.feature import hog
 from skimage.transform import resize
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import train_test_split
-from sklearn import preprocessing
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.svm import SVC
 from sklearn.ensemble import GradientBoostingClassifier
-#from project_functions import get_list_images, plot_hist_size, hist_middle, class2mat, train_test_model
-
-
-# %% functions
-
-def get_list_images():
-    """
-    This function defines the path of the data folder and lists int content
-    :return: path of data folder and a list of the images in the folder
-
-    """
-
-    path = Path('./data').absolute()
-    return path, os.listdir(path)
-
-
-def plot_hist_size(sizes, name_of_size):
-    """
-    This function plots a histogram from a list of sizes
-    :param sizes: list of sizes we want to plot histogram for
-    :param name_of_size: the name of the size (for example: 'width', 'height', 'length')
-    :return: histogram of the sizes
-    """
-    plt.hist(sizes)
-    plt.xlabel(name_of_size)
-    plt.ylabel('count')
-    plt.title('histogram of ' + name_of_size + 's')
-    plt.show()
-
-
-def hist_middle(lst):
-    """
-    This function calculates the average of the bin with the highest histogram count
-    :param lst: list of sizes
-    :return: new_size: the value which is the middle of the bin with the most counts
-    """
-    hist = np.histogram(lst)
-    new_idx = np.where(hist[0] == np.max(hist[0]))
-    new_size = np.round((hist[1][new_idx[0][0]] + hist[1][new_idx[0][0] + 1]) / 2)
-    return new_size
-
-
-def class2mat(pattern, w, h, names, path):
-    """
-    This function assigns all images in a certain class into a numpy array, after resizing them
-    :param pattern: The pattern of the class. for example, for images from class 1: 'l1nr'
-    :param w: the new width of the images (they are resized to it)
-    :param h: the new height of the images (they are resized to it)
-    :param names: a list of names of all the images
-    :param path: path of the data folder that contains the images
-    :return: full_mat: a numpy array contains all the images in the class
-    """
-    class_images = list(filter(lambda x: pattern in x, names))
-    full_mat = np.zeros((int(h), int(w), 75))
-
-    for j in range(0, len(class_images)):
-        class_img_path = path + '/' + class_images[j]
-        class_img = cv2.imread(class_img_path, cv2.IMREAD_GRAYSCALE)
-        img_resized = resize(class_img, (h, w))
-        full_mat[:, :, j] = img_resized
-    return full_mat
+from project_functions import get_list_images, plot_hist_size, hist_middle, class2mat, make_pca_exp_var, train_test_model
 
 
 # %% hist of widths and heights
@@ -147,24 +83,7 @@ features_data = np.array(features)
 
 # %% PCA
 
-# mean center
-data_centered = preprocessing.scale(features_data, with_std=False, axis=1)
-
-# fitting PCA
-pca = PCA()
-pca.fit(data_centered)
-
-# plotting explained variance
-exp_var = pca.explained_variance_ratio_
-exp_var_cumsum = exp_var.cumsum()
-plt.plot(exp_var_cumsum, label='Cumulative sum')
-plt.plot(exp_var, label='Individual component')
-
-plt.title("Explained Variance by Number of Principal Components")
-plt.xlabel('# Principal component')
-plt.ylabel("Explained Variance")
-plt.legend()
-plt.show()
+data_centered, exp_var_all, exp_var_all_cumsum = make_pca_exp_var(features_data)
 
 # not good enough for EDA
 
@@ -175,31 +94,13 @@ pca100.fit(data_centered)
 data_reduced = pca100.transform(data_centered)
 reduced_var = pca100.explained_variance_ratio_.cumsum()
 
-# %% PCA for each class
-
-explained_variance = np.empty((15, 75))
-labels_array = np.array(all_labels)
-for i in range(0, 14):
-    class_label = i + 1
-    label_idxs = np.where(labels_array == class_label)
-    PCA_data = data_centered[label_idxs]
-    class_pca = PCA()
-    class_pca.fit(PCA_data)
-    plt.plot(class_pca.explained_variance_ratio_.cumsum(),
-             label='class' + str(class_label))
-
-plt.title("Explained Variance by Number of Principal Components")
-plt.xlabel('# Principal component')
-plt.ylabel("Explained Variance")
-plt.legend()
-plt.show()
-
 # %% tSNE
 
 # fitting tSNE
 tSNE = TSNE()
 tSNE_features = tSNE.fit_transform(features_data)
 
+labels_array = np.array(all_labels)
 tSNE_df = pd.DataFrame(tSNE_features)
 tSNE_df.columns = ['x', 'y']
 tSNE_df['class'] = labels_array
@@ -211,7 +112,7 @@ plt.legend(bbox_to_anchor=(1, 1), loc='upper left', borderaxespad=0)
 plt.title('tSNE')
 plt.show()
 
-# %% labels - choosing thw wanted class to predict
+# %% labels - choosing the wanted class to predict
 
 wanted_label = 7
 labels = labels_array == wanted_label
@@ -220,15 +121,6 @@ labels = np.dot(labels, 1)
 # %% train test split
 
 X_train, X_test, y_train, y_test = train_test_split(data_reduced, labels, test_size=0.33, random_state=0)
-
-# %% Showing imbalanced data - example of 2 features
-
-counter_imbalanced = Counter(labels)
-sns.scatterplot(X_train[:, 49], X_train[:, 99], hue=y_train)
-plt.xlabel('column 50')
-plt.ylabel('column 100')
-plt.title(counter_imbalanced)
-plt.show()
 
 # %% MlP classifier
 
@@ -242,9 +134,9 @@ MLP_parameters = {
     'model__learning_rate_init': [0.001, 0.1, 10]
 }
 
-MLP_params, MLP_train, MLP_validation = train_test_model(model_MLP, MLP_parameters,
-                                                         X_train, y_train,
-                                                         X_test, y_test)
+MLP_params = train_test_model(model_MLP, MLP_parameters,
+                              X_train, y_train,
+                              X_test, y_test)
 
 # %% SVM
 
@@ -255,9 +147,9 @@ SVM_parameters = {
     'model__kernel': ['linear', 'poly', 'rbf', 'sigmoid']
 }
 
-SVM_params, SVM_train, SVM_validation = train_test_model(model_SVM, SVM_parameters,
-                                                         X_train, y_train,
-                                                         X_test, y_test)
+SVM_params = train_test_model(model_SVM, SVM_parameters,
+                              X_train, y_train,
+                              X_test, y_test)
 
 # %% Gradient boosting
 
@@ -270,9 +162,9 @@ GB_parameters = {
     'model__learning_rate': [0.001, 0.1, 0.5, 0.7],
 }
 
-GB_params, GB_train, GB_validation = train_test_model(model_GB, GB_parameters,
-                                                      X_train, y_train,
-                                                      X_test, y_test)
+GB_params = train_test_model(model_GB, GB_parameters,
+                             X_train, y_train,
+                             X_test, y_test)
 
 # if __name__ == "__main__":
 #     main()

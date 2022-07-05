@@ -3,13 +3,14 @@ import os
 from sklearn.model_selection import GridSearchCV
 from sklearn import metrics
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 import numpy as np
 import cv2
 from skimage.transform import resize
 import matplotlib.pyplot as plt
-import pandas as pd
+from sklearn import preprocessing
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 
 def get_list_images():
@@ -33,7 +34,7 @@ def plot_hist_size(sizes, name_of_size):
     plt.hist(sizes)
     plt.xlabel(name_of_size)
     plt.ylabel('count')
-    plt.title('histogram of '+name_of_size+'s')
+    plt.title('histogram of ' + name_of_size + 's')
     plt.show()
 
 
@@ -70,8 +71,46 @@ def class2mat(pattern, w, h, names, path):
     return full_mat
 
 
-# fitting the model classifier using GridSearchCV + testing the model and printing results
+def make_pca_exp_var(data):
+    """
+    This function performs PCA and plots the explained variance of the data
+    :param data: a df of features (without labels)
+    :return: the centered df after scaling, explained variance, cumulative explained variance and their plot
+    """
+
+    # mean center
+    data_mean = preprocessing.scale(data, with_std=False, axis=1)
+
+    # fitting PCA
+    pca = PCA()
+    pca.fit(data_mean)
+
+    # plotting explained variance
+    exp_var = pca.explained_variance_ratio_
+    exp_var_cumsum = exp_var.cumsum()
+    plt.plot(exp_var_cumsum, label='Cumulative sum')
+    plt.plot(exp_var, label='Individual component')
+    plt.title("Explained Variance by Number of Principal Components")
+    plt.xlabel('# Principal component')
+    plt.ylabel("Explained Variance")
+    plt.legend()
+    plt.show()
+
+    return data_mean, exp_var, exp_var_cumsum
+
+
 def train_test_model(model, parameters, train_set, train_labels, test_set, test_labels):
+    """
+    This function trains a machine learning model on a test set,  with combination of parameters and tests it
+
+    :param model: The model that will be trained on the data
+    :param parameters: a dictionary of parameters that can be inserted to the model
+    :param train_set: numpy array of samples that will be used to train the model
+    :param train_labels: numpy array of the labels of the train set
+    :param test_set: numpy array of samples that will be used to test the model
+    :param test_labels: numpy array of the labels of the test set
+    :return: confusion matrix and ROC curve as a plot, in addition to the best parameters chosen for the model
+    """
     # scaling
     general_scaler = StandardScaler()
     train_set = general_scaler.fit_transform(train_set)
@@ -86,19 +125,6 @@ def train_test_model(model, parameters, train_set, train_labels, test_set, test_
 
     # results of hyper parameter tuning
     best_params = clf.best_params_
-
-    tuning_results = pd.DataFrame(clf.cv_results_)
-
-    maximal_idx = tuning_results['mean_test_AUC'].idxmax()
-
-    train_results = tuning_results[['split0_train_AUC', 'split1_train_AUC', 'split2_train_AUC',
-                                    'split3_train_AUC', 'split4_train_AUC',
-                                    'mean_train_AUC', 'std_train_AUC']]
-    validation_results = tuning_results[['split0_test_AUC', 'split1_test_AUC', 'split2_test_AUC',
-                                         'split3_test_AUC', 'split4_test_AUC',
-                                         'mean_test_AUC', 'std_test_AUC']]
-    best_train_results = pd.DataFrame(train_results.iloc[maximal_idx])
-    best_validation_results = pd.DataFrame(validation_results.iloc[maximal_idx])
 
     # testing
     y_preds = clf.predict(test_set)
@@ -119,4 +145,4 @@ def train_test_model(model, parameters, train_set, train_labels, test_set, test_
     disp.plot(cmap=cmap)
     plt.show()
 
-    return best_params, best_train_results, best_validation_results
+    return best_params
