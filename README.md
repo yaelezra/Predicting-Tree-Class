@@ -18,4 +18,3 @@ Main packages that were used in this project:
 * CV2
 * matplotlib
 * seaborn 
-* pandas
